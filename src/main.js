@@ -12,18 +12,20 @@ const galleryStyles = new SimpleLightbox('.gallery-list a', {
   captionDelay: 250,
 });
 
-// "Витягаємо" необхідні об'єкти з HTML-файлу
 const galleryElements = document.querySelector('.gallery-list');
 const form = document.querySelector('.search-form');
 const loaderEl = document.querySelector('.loader');
 const loadMoreBtn = document.querySelector('.loadMoreBtn');
+let searchValue = '';
+let currentPage;
+let totalPages;
 
 async function onSubmitForm(event) {
   event.preventDefault();
-
   try {
-    const searchValue = event.currentTarget.elements.userInput.value.trim();
-    // Перевіряємо, чи був введений запит
+    searchValue = event.currentTarget.elements.userInput.value.trim();
+    loadMoreBtn.classList.add('is-hidden');
+
     if (searchValue === '') {
       galleryElements.innerHTML = '';
       event.currentTarget.reset();
@@ -33,29 +35,25 @@ async function onSubmitForm(event) {
         timeout: 3000,
       });
     }
-    // Якщо все ок, створюємо запит і активуємо loader
+
     galleryElements.innerHTML = '';
+    currentPage = 1;
     loaderEl.classList.remove('is-hidden');
 
-    // Створюємо змінну, в яку поміщаємо весь об'єкт відповіді від API
-    const responseObj = await fetchData(searchValue);
+    const responseObj = await fetchData(searchValue, currentPage);
     console.log('responseObj: ', responseObj);
 
-    // Дістаємо з об'єкта всі необхідні дані
     const imgArray = responseObj.data.hits;
     console.log('imgArray: ', imgArray);
-    const totalImgs = responseObj.data.total;
-    console.log(totalImgs);
-    let currentPage = responseObj.config.params.page;
-    console.log('currentPage: ', currentPage);
+    const totalImgs = responseObj.data.totalHits;
     const perPage = responseObj.config.params.per_page;
-    console.log('perPage: ', perPage);
-    const totalPages = Math.ceil(totalImgs / perPage);
-    console.log('totalPages: ', totalPages);
+    totalPages = Math.ceil(totalImgs / perPage);
 
-    // Перевіряємо, чи не пустий об'єкт
     if (imgArray.length === 0) {
+      console.log('No images found');
       loaderEl.classList.add('is-hidden');
+      // galleryElements.innerHTML = '';
+      event.currentTarget.reset();
       return iziToast.error({
         message:
           'Sorry, there are no images matching your search query. Please try again!',
@@ -68,62 +66,57 @@ async function onSubmitForm(event) {
         iconColor: '#fafafb',
       });
     }
+
     loaderEl.classList.add('is-hidden');
     const galleryMarkup = await createGalleryMarkup(imgArray);
     galleryElements.innerHTML = galleryMarkup;
+
     if (totalPages > 1) {
       loadMoreBtn.classList.remove('is-hidden');
-      loadMoreBtn.addEventListener('click', () => {
-        try {
-          currentPage++;
-          const loadMoreData = fetchData(searchValue, currentPage);
-          const addedImgArray = loadMoreData.data.hits;
-
-          if (currentPage <= totalPages) {
-            const editedGalleryMarkup = createGalleryMarkup(addedImgArray);
-            galleryElements.innerHTML += editedGalleryMarkup;
-          } else {
-            loadMoreBtn.classList.add('is-hidden');
-            return iziToast.error({
-              position: 'topRight',
-              message: "We're sorry, there are no more pictures to load",
-            });
-          }
-        } catch (error) {
-          return new Error('Oops, something went wrong 😞');
-        }
-      });
     }
 
     event.target.reset();
     galleryStyles.refresh();
-    loaderEl.classList.add('is-hidden');
-    loadMoreBtn.classList.add('.is-hidden');
   } catch (error) {
+    loaderEl.classList.add('is-hidden');
+    loadMoreBtn.classList.add('is-hidden');
     return new Error('Oops, something went wrong 😞');
   }
 }
 
-// async function onClickLoadMore(searchValue, currentPage, totalPages) {
-//   try {
-//     currentPage++;
-//     const loadMoreData = await fetchData(searchValue, currentPage);
-//     const addedImgArray = loadMoreData.data.hits;
+async function onClickLoadMore() {
+  try {
+    currentPage++;
+    loaderEl.classList.remove('is-hidden');
 
-//     if (currentPage <= totalPages) {
-//       const editedGalleryMarkup = await createGalleryMarkup(addedImgArray);
-//       galleryElements.innerHTML += editedGalleryMarkup;
-//     } else {
-//       loadMoreBtn.classList.add('is-hidden');
-//       return iziToast.error({
-//         position: 'topRight',
-//         message: "We're sorry, there are no more pictures to load",
-//       });
-//     }
-//   } catch (error) {
-//     return new Error('Oops, something went wrong 😞');
-//   }
-// }
+    const loadMoreData = await fetchData(searchValue, currentPage);
+    const addedImgArray = loadMoreData.data.hits;
+    const editedGalleryMarkup = await createGalleryMarkup(addedImgArray);
+    loaderEl.classList.add('is-hidden');
+    galleryElements.innerHTML += editedGalleryMarkup;
+    const imageCard = document.querySelector('.image-card');
+    const rect = imageCard.getBoundingClientRect();
+    window.scrollBy({
+      top: rect.height * 2,
+      behavior: 'smooth',
+    });
 
-// loadMoreBtn.addEventListener('click', onClickLoadMore);
+    galleryStyles.refresh();
+
+    if (currentPage >= totalPages) {
+      loadMoreBtn.classList.add('is-hidden');
+      return iziToast.info({
+        position: 'topRight',
+        message: "We're sorry, there are no more pictures to load",
+      });
+    }
+    // loadMoreBtn.classList.add('.is-hidden');
+  } catch (error) {
+    loaderEl.classList.add('is-hidden');
+    loadMoreBtn.classList.add('is-hidden');
+    return new Error('Oops, something went wrong 😞');
+  }
+}
+
 form.addEventListener('submit', onSubmitForm);
+loadMoreBtn.addEventListener('click', onClickLoadMore);
