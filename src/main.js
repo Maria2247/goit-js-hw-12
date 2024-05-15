@@ -25,9 +25,10 @@ async function onSubmitForm(event) {
   try {
     searchValue = event.currentTarget.elements.userInput.value.trim();
     loadMoreBtn.classList.add('is-hidden');
+    galleryElements.innerHTML = '';
+    currentPage = 1;
 
     if (searchValue === '') {
-      galleryElements.innerHTML = '';
       event.currentTarget.reset();
       return iziToast.warning({
         message: 'Type your query, please!',
@@ -36,8 +37,6 @@ async function onSubmitForm(event) {
       });
     }
 
-    galleryElements.innerHTML = '';
-    currentPage = 1;
     loaderEl.classList.remove('is-hidden');
 
     const responseObj = await fetchData(searchValue, currentPage);
@@ -52,8 +51,7 @@ async function onSubmitForm(event) {
     if (imgArray.length === 0) {
       console.log('No images found');
       loaderEl.classList.add('is-hidden');
-      // galleryElements.innerHTML = '';
-      event.currentTarget.reset();
+      event.target.reset();
       return iziToast.error({
         message:
           'Sorry, there are no images matching your search query. Please try again!',
